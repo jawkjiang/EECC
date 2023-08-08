@@ -8,12 +8,14 @@ from functools import partial
 
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QMessageBox, QFileDialog, QComboBox, QSlider, \
     QCheckBox, QGroupBox, QLineEdit, QTextEdit, QTableView, QHeaderView, QAbstractItemView, QTableWidgetItem, QMenu, \
-    QAction
+    QAction, QFormLayout, QScrollArea, QSizePolicy
 from PyQt5.QtGui import QPixmap, QIcon, QStandardItemModel, QStandardItem
-from PyQt5.QtCore import Qt, QEvent
+from PyQt5.QtCore import Qt, QEvent, QSize
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+import algorithm
 
 # 获取exe根目录
 base_path: str
@@ -354,13 +356,13 @@ class StationWindow(QWidget):
 
         if action == edit_action:
             row = self.tableview.currentIndex().row()
-            self.edit_list = []
+            edit_list = []
             for col in range(self.tableview.model().columnCount()):
                 editor = QLineEdit(self.tableview)
                 editor.setText(self.tableview.model().data(self.tableview.model().index(row, col)))
                 editor.installEventFilter(self)
                 self.tableview.setIndexWidget(self.tableview.model().index(row, col), editor)
-                self.edit_list.append(editor)
+                edit_list.append(editor)
 
         elif action == delete_action:
             self.tableview_model.removeRow(self.tableview.currentIndex().row())
@@ -400,33 +402,41 @@ class AIWindow(QWidget):
         self.input_text = QLineEdit(self)
         self.input_text.move(20, 20)
         self.input_text.setFixedWidth(760)
-        self.input_text.setStyleSheet("font:18px Microsoft YaHei; color:black;")
+        self.input_text.setStyleSheet("font:16px Microsoft YaHei; color:black;")
 
-        self.button_send = QPushButton("发送", self)
-        self.button_send.move(420, 60)
-        self.button_send.setFixedWidth(120)
-        self.button_send.setStyleSheet("font:18px Microsoft YaHei; color:black;")
+        self.combobox_prompt = QComboBox(self)
+        self.combobox_prompt.move(40, 63)
+        self.combobox_prompt.setFixedWidth(150)
+        self.combobox_prompt.setStyleSheet("font:16px Microsoft YaHei; color:black;")
+        self.combobox_prompt.addItem("AI参数配置")
+        self.combobox_prompt.addItem("ChatGPT聊天")
 
         self.combobox_model = QComboBox(self)
-        self.combobox_model.move(560, 60)
+        self.combobox_model.move(440, 63)
         self.combobox_model.setFixedWidth(200)
-        self.combobox_model.setStyleSheet("font:18px Microsoft YaHei; color:black;")
-        self.combobox_model.addItem("GPT-3.5-turbo")
+        self.combobox_model.setStyleSheet("font:16px Microsoft YaHei; color:black;")
+        self.combobox_model.addItem("gpt-3.5-turbo")
         self.combobox_model.addItem("gpt-3.5-turbo-16k")
         self.combobox_model.addItem("gpt-4")
         self.combobox_model.addItem("gpt-4-32k")
         self.combobox_model.addItem("text-davinci-003")
         self.combobox_model.addItem("text-embedding-ada-002")
 
+        self.button_send = QPushButton("发送", self)
+        self.button_send.move(660, 61)
+        self.button_send.setFixedWidth(120)
+        self.button_send.setStyleSheet("font:16px Microsoft YaHei; color:black;")
+        self.button_send.setShortcut("ctrl+return")
+
         self.output_text = QTextEdit(self)
         self.output_text.move(20, 100)
         self.output_text.setFixedWidth(760)
         self.output_text.setFixedHeight(480)
-        self.output_text.setStyleSheet("font:18px Microsoft YaHei;"
+        self.output_text.setStyleSheet("font:16px Microsoft YaHei;"
                                        "color:black;")
         self.output_text.setReadOnly(True)
 
-        self.button_send.clicked.connect(self.AI_connect)
+        self.button_send.clicked.connect(lambda: self.AI_connect(self.combobox_model.currentText()))
 
     def AI_connect(self, model):
         import OpenAIConnection
@@ -435,7 +445,6 @@ class AIWindow(QWidget):
             "AI：\n" + OpenAIConnection.chat(self.input_text.text(), model) + "\n--------------------------")
 
 
-# 绘制运算结果界面
 class ResultWindow(QWidget):
 
     def __init__(self, entry_window: EntryWindow, num):
@@ -510,35 +519,29 @@ class ResultWindow(QWidget):
             self.power_label_list[i].setStyleSheet("font:18px Microsoft YaHe; font-weight:700; color:rgb(47, 52, 73)")
             self.power_label_list[i].move(330, 165 + 24 * i)
 
-        # 设置储能对象出力图
-        self.image1_power = QLabel(self)
-        self.image1_power.setFixedWidth(350)
-        self.image1_power.setFixedHeight(200)
-        self.image1_power.setPixmap(QPixmap(base_path + "/images/氢储能(2).jpg"))
-        self.image1_power.move(890, 80)
-
-        self.image2_power = QLabel(self)
-        self.image2_power.setPixmap(QPixmap(base_path + "/images/电化学(2).jpg"))
-        self.image2_power.move(890, 280)
-
-        self.image3_power = QLabel(self)
-        self.image3_power.setPixmap(QPixmap(base_path + "/images/抽水蓄能(2).jpg"))
-        self.image3_power.move(890, 480)
-
         # 大地图按钮示例
         self.button_6 = QPushButton("6", self)
         self.button_6.move(657, 328)
         self.button_6.setFixedSize(20, 20)
         self.button_6.setStyleSheet("font:16px Microsoft YaHei; font-weight:700; color:rgb(47, 52, "
                                     "73); background-color:rgb(0, 255, 255)")
-        self.button_6.clicked.connect(self.image_show, 6)
+        self.button_6.clicked.connect(self.image_show)
 
         self.button_8 = QPushButton("8", self)
         self.button_8.move(626, 557)
         self.button_8.setFixedSize(20, 20)
         self.button_8.setStyleSheet("font:16px Microsoft YaHei; font-weight:700; color:rgb(47, 52, "
                                     "73); background-color:rgb(0, 255, 255)")
-        self.button_8.clicked.connect(self.image_show, 8)
+        self.button_8.clicked.connect(self.image_show)
+
+        self.form_window = QWidget(self)
+        self.form_window.move(890, 80)
+        self.form_window.resize(350, 600)
+        self.form_window.setStyleSheet("background-color:rgb(195, 198, 197)")
+        self.form_window.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        self.form = QFormLayout(self.form_window)
+        self.form.setVerticalSpacing(10)
 
     # 设置导出文件函数
     def save_file(self):
@@ -563,26 +566,101 @@ class ResultWindow(QWidget):
         for i in range(15):
             self.power_label_list[i].setText(power_list[new_value][i])
 
-    def image_show(self, number):
-        x = [i for i in range(96)]
-        y = []
-        for i in range(96):
-            y.append(power_list[i][number - 1])
-        fig = plt.figure(figsize=(350 / 100, 200 / 100), dpi=100)
-        plt.plot(x, y)
-        plt.subplots_adjust(left=0.2, right=0.9, bottom=0.2, top=0.9)
-        plt.title("Sine Curve")
-        plt.xlabel("time")
-        plt.ylabel("power")
-        figure_canvas = FigureCanvas(fig)
+    # 设置储能对象出力图的链接函数
+    def image_show(self):
+        for i in range(15):
+            x = [j for j in range(96)]
+            y = []
+            for j in range(96):
+                y.append(power_list[j][i])
+            fig = plt.figure(figsize=(300 / 100, 400 / 100), dpi=100)
+            ax = fig.add_subplot(111)
+            ax.invert_yaxis()
+            plt.plot(x, y)
+            plt.tick_params(labelsize=6)
+            plt.subplots_adjust(left=0.2, right=0.95, bottom=0.15, top=0.89)
+            plt.title(f"{i+1}号储能对象出力图", font="Microsoft YaHei", fontsize=10)
+            plt.xlabel("时间/15min", font="Microsoft YaHei", fontsize=8)
+            plt.ylabel("出力/kW", font="Microsoft YaHei", fontsize=8, labelpad=-2)
+            figure_canvas = FigureCanvas(fig)
 
-        buffer = io.BytesIO()
-        figure_canvas.print_png(buffer)
-        buffer.seek(0)
+            buffer = io.BytesIO()
+            figure_canvas.print_png(buffer)
+            buffer.seek(0)
 
-        pixmap = QPixmap()
-        pixmap.loadFromData(buffer.getvalue())
-        self.image1_power.setPixmap(pixmap)
+            pixmap = QPixmap()
+            pixmap.loadFromData(buffer.getvalue())
+            plt.close(fig)
+
+            label = QLabel()
+            label.setPixmap(pixmap)
+            self.form.addRow(label)
+
+            exec(f"Button{i+1} = QPushButton()")
+            exec(f"Button{i+1}.setFixedSize(20, 20)")
+            exec(f"Button{i+1}.setIcon(QIcon('images/放大.jpg'))")
+            exec(f"Button{i+1}.setIconSize(QSize(20, 20))")
+            # 按下按钮后弹出新窗口
+            exec(f"Button{i+1}.clicked.connect(partial(self.enlarge, {i+1}))")
+
+            exec(f"self.form.addRow(Button{i+1})")
+
+        scroll = QScrollArea(self)
+        scroll.setWidget(self.form_window)
+        scroll.setWidgetResizable(True)
+        scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.move(890, 80)
+        scroll.resize(350, 600)
+        scroll.setStyleSheet("background-color:rgb(195, 198, 197)")
+        scroll.show()
+
+    def enlarge(self, number):
+        try:
+            exec(f"self.enlarge_window{number}.show()")
+        except AttributeError:
+            exec(f"self.enlarge_window{number} = self.enlarge_window(number)")
+            exec(f"self.enlarge_window{number}.show()")
+
+    class enlarge_window(QWidget):
+
+        def __init__(self, number):
+            super().__init__()
+
+            self.setWindowTitle(f"{number}号储能对象出力图")
+            self.resize(800, 600)
+            self.setStyleSheet("background-color:rgb(255, 255, 255)")
+
+            x = [j for j in range(96)]
+            y = []
+            for j in range(96):
+                y.append(power_list[j][number - 1])
+            self.fig = plt.figure(figsize=(800 / 100, 600 / 100), dpi=100)
+            ax = self.fig.add_subplot(111)
+            ax.invert_yaxis()
+            plt.plot(x, y)
+            plt.tick_params(labelsize=10)
+            plt.subplots_adjust(left=0.1, right=0.95, bottom=0.15, top=0.9)
+            plt.title(f"{number}号储能对象出力图", font="Microsoft YaHei", fontsize=16)
+            plt.xlabel("时间/15min", font="Microsoft YaHei", fontsize=14)
+            plt.ylabel("出力/kW", font="Microsoft YaHei", fontsize=14, labelpad=-2)
+            self.figure_canvas = FigureCanvas(self.fig)
+
+            self.buffer = io.BytesIO()
+            self.figure_canvas.print_png(self.buffer)
+            self.buffer.seek(0)
+
+            self.pixmap = QPixmap()
+            self.pixmap.loadFromData(self.buffer.getvalue())
+            plt.close(self.fig)
+
+            self.label = QLabel(self)
+            self.label.setPixmap(self.pixmap)
+            self.label.move(0, 0)
+            self.label.resize(800, 600)
+
+            self.show()
 
     # 设置大地图按钮的链接函数
     def image1_change(self):
